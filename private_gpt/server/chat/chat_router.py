@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Request
 from llama_index.core.llms import ChatMessage, MessageRole
 from pydantic import BaseModel
@@ -22,6 +24,7 @@ class ChatBody(BaseModel):
     context_filter: ContextFilter | None = None
     include_sources: bool = True
     stream: bool = False
+    mode: Literal["clinical", "moa", "protein", "regulatory"] | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -96,6 +99,7 @@ def chat_completion(
             messages=all_messages,
             use_context=body.use_context,
             context_filter=body.context_filter,
+            mode=body.mode,
         )
         return StreamingResponse(
             to_openai_sse_stream(
@@ -109,6 +113,7 @@ def chat_completion(
             messages=all_messages,
             use_context=body.use_context,
             context_filter=body.context_filter,
+            mode=body.mode,
         )
         return to_openai_response(
             completion.response, completion.sources if body.include_sources else None

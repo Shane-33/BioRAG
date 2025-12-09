@@ -161,6 +161,21 @@ class EmbeddingComponent:
                     api_key=api_key,
                     model=model,
                 )
+            case "bio":
+                try:
+                    from private_gpt.components.embedding.bio_embedding import (
+                        BioEmbedding,
+                    )
+                except ImportError as e:
+                    raise ImportError(
+                        "Bio embedding dependencies not found, install with `poetry install --extras embeddings-huggingface`"
+                    ) from e
+
+                self.embedding_model = BioEmbedding(
+                    model_name=settings.huggingface.embedding_hf_model_name,
+                    cache_folder=str(models_cache_path),
+                    trust_remote_code=settings.huggingface.trust_remote_code,
+                )
             case "mock":
                 # Not a random number, is the dimensionality used by
                 # the default embedding model

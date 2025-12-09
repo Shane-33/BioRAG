@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from injector import inject, singleton
 from llama_index.core.chat_engine import ContextChatEngine, SimpleChatEngine
@@ -20,6 +20,10 @@ from pydantic import BaseModel
 from private_gpt.components.embedding.embedding_component import EmbeddingComponent
 from private_gpt.components.llm.llm_component import LLMComponent
 from private_gpt.components.node_store.node_store_component import NodeStoreComponent
+from private_gpt.components.prompts.clinical_prompt import ClinicalPromptTemplate
+from private_gpt.components.prompts.moa_prompt import MOAPromptTemplate
+from private_gpt.components.prompts.protein_prompt import ProteinPromptTemplate
+from private_gpt.components.prompts.regulatory_prompt import RegulatoryPromptTemplate
 from private_gpt.components.vector_store.vector_store_component import (
     VectorStoreComponent,
 )
@@ -105,13 +109,34 @@ class ChatService:
             show_progress=True,
         )
 
+    def _get_prompt_template(
+        self, mode: Literal["clinical", "moa", "protein", "regulatory"] | None
+    ):
+        """Get the appropriate prompt template based on mode."""
+        if mode == "clinical":
+            return ClinicalPromptTemplate
+        elif mode == "moa":
+            return MOAPromptTemplate
+        elif mode == "protein":
+            return ProteinPromptTemplate
+        elif mode == "regulatory":
+            return RegulatoryPromptTemplate
+        return None
+
     def _chat_engine(
         self,
         system_prompt: str | None = None,
         use_context: bool = False,
         context_filter: ContextFilter | None = None,
+        mode: Literal["clinical", "moa", "protein", "regulatory"] | None = None,
     ) -> BaseChatEngine:
         settings = self.settings
+        
+        # Apply biotech mode prompt if specified (override any existing system prompt)
+        prompt_template = self._get_prompt_template(mode)
+        if prompt_template:
+            system_prompt = prompt_template.get_system_prompt()
+        
         if use_context:
             vector_index_retriever = self.vector_store_component.get_retriever(
                 index=self.index,
@@ -151,6 +176,7 @@ class ChatService:
         messages: list[ChatMessage],
         use_context: bool = False,
         context_filter: ContextFilter | None = None,
+        mode: Literal["clinical", "moa", "protein", "regulatory"] | None = None,
     ) -> CompletionGen:
         chat_engine_input = ChatEngineInput.from_messages(messages)
         last_message = (
@@ -171,6 +197,7 @@ class ChatService:
             system_prompt=system_prompt,
             use_context=use_context,
             context_filter=context_filter,
+            mode=mode,
         )
         streaming_response = chat_engine.stream_chat(
             message=last_message if last_message is not None else "",
@@ -187,6 +214,7 @@ class ChatService:
         messages: list[ChatMessage],
         use_context: bool = False,
         context_filter: ContextFilter | None = None,
+        mode: Literal["clinical", "moa", "protein", "regulatory"] | None = None,
     ) -> Completion:
         chat_engine_input = ChatEngineInput.from_messages(messages)
         last_message = (
@@ -207,6 +235,7 @@ class ChatService:
             system_prompt=system_prompt,
             use_context=use_context,
             context_filter=context_filter,
+            mode=mode,
         )
         wrapped_response = chat_engine.chat(
             message=last_message if last_message is not None else "",

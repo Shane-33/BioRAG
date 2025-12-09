@@ -205,6 +205,7 @@ class EmbeddingSettings(BaseModel):
         "mock",
         "gemini",
         "mistralai",
+        "bio",
     ]
     ingest_mode: Literal["simple", "batch", "parallel", "pipeline"] = Field(
         "simple",

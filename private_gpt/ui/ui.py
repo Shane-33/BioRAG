@@ -32,7 +32,7 @@ THIS_DIRECTORY_RELATIVE = Path(__file__).parent.relative_to(PROJECT_ROOT_PATH)
 # Should be "private_gpt/ui/avatar-bot.ico"
 AVATAR_BOT = THIS_DIRECTORY_RELATIVE / "avatar-bot.ico"
 
-UI_TAB_TITLE = "My Private GPT"
+UI_TAB_TITLE = "My BioRAG Assistant"
 
 SOURCES_SEPARATOR = "<hr>Sources: \n"
 
@@ -42,6 +42,10 @@ class Modes(str, Enum):
     SEARCH_MODE = "Search"
     BASIC_CHAT_MODE = "Basic"
     SUMMARIZE_MODE = "Summarize"
+    CLINICAL_MODE = "Clinical"
+    MOA_MODE = "MOA"
+    PROTEIN_MODE = "Protein"
+    REGULATORY_MODE = "Regulatory"
 
 
 MODES: list[Modes] = [
@@ -49,6 +53,10 @@ MODES: list[Modes] = [
     Modes.SEARCH_MODE,
     Modes.BASIC_CHAT_MODE,
     Modes.SUMMARIZE_MODE,
+    Modes.CLINICAL_MODE,
+    Modes.MOA_MODE,
+    Modes.PROTEIN_MODE,
+    Modes.REGULATORY_MODE,
 ]
 
 
@@ -231,6 +239,86 @@ class PrivateGptUi:
                     instructions=message,
                 )
                 yield from yield_tokens(summary_stream)
+            case Modes.CLINICAL_MODE:
+                # Clinical mode with biotech-specific prompts
+                context_filter = None
+                if self._selected_filename is not None:
+                    docs_ids = []
+                    for ingested_document in self._ingest_service.list_ingested():
+                        if (
+                            ingested_document.doc_metadata["file_name"]
+                            == self._selected_filename
+                        ):
+                            docs_ids.append(ingested_document.doc_id)
+                    context_filter = ContextFilter(docs_ids=docs_ids)
+
+                query_stream = self._chat_service.stream_chat(
+                    messages=all_messages,
+                    use_context=True,
+                    context_filter=context_filter,
+                    mode="clinical",
+                )
+                yield from yield_deltas(query_stream)
+            case Modes.MOA_MODE:
+                # MOA mode with biotech-specific prompts
+                context_filter = None
+                if self._selected_filename is not None:
+                    docs_ids = []
+                    for ingested_document in self._ingest_service.list_ingested():
+                        if (
+                            ingested_document.doc_metadata["file_name"]
+                            == self._selected_filename
+                        ):
+                            docs_ids.append(ingested_document.doc_id)
+                    context_filter = ContextFilter(docs_ids=docs_ids)
+
+                query_stream = self._chat_service.stream_chat(
+                    messages=all_messages,
+                    use_context=True,
+                    context_filter=context_filter,
+                    mode="moa",
+                )
+                yield from yield_deltas(query_stream)
+            case Modes.PROTEIN_MODE:
+                # Protein mode with biotech-specific prompts
+                context_filter = None
+                if self._selected_filename is not None:
+                    docs_ids = []
+                    for ingested_document in self._ingest_service.list_ingested():
+                        if (
+                            ingested_document.doc_metadata["file_name"]
+                            == self._selected_filename
+                        ):
+                            docs_ids.append(ingested_document.doc_id)
+                    context_filter = ContextFilter(docs_ids=docs_ids)
+
+                query_stream = self._chat_service.stream_chat(
+                    messages=all_messages,
+                    use_context=True,
+                    context_filter=context_filter,
+                    mode="protein",
+                )
+                yield from yield_deltas(query_stream)
+            case Modes.REGULATORY_MODE:
+                # Regulatory mode with biotech-specific prompts
+                context_filter = None
+                if self._selected_filename is not None:
+                    docs_ids = []
+                    for ingested_document in self._ingest_service.list_ingested():
+                        if (
+                            ingested_document.doc_metadata["file_name"]
+                            == self._selected_filename
+                        ):
+                            docs_ids.append(ingested_document.doc_id)
+                    context_filter = ContextFilter(docs_ids=docs_ids)
+
+                query_stream = self._chat_service.stream_chat(
+                    messages=all_messages,
+                    use_context=True,
+                    context_filter=context_filter,
+                    mode="regulatory",
+                )
+                yield from yield_deltas(query_stream)
 
     # On initialization and on mode change, this function set the system prompt
     # to the default prompt based on the mode (and user settings).
@@ -247,6 +335,27 @@ class PrivateGptUi:
             # For summarization mode, obtain default system prompt from settings
             case Modes.SUMMARIZE_MODE:
                 p = settings().ui.default_summarization_system_prompt
+            # For biotech modes, use domain-specific prompts
+            case Modes.CLINICAL_MODE:
+                from private_gpt.components.prompts.clinical_prompt import (
+                    ClinicalPromptTemplate,
+                )
+                p = ClinicalPromptTemplate.get_system_prompt()
+            case Modes.MOA_MODE:
+                from private_gpt.components.prompts.moa_prompt import (
+                    MOAPromptTemplate,
+                )
+                p = MOAPromptTemplate.get_system_prompt()
+            case Modes.PROTEIN_MODE:
+                from private_gpt.components.prompts.protein_prompt import (
+                    ProteinPromptTemplate,
+                )
+                p = ProteinPromptTemplate.get_system_prompt()
+            case Modes.REGULATORY_MODE:
+                from private_gpt.components.prompts.regulatory_prompt import (
+                    RegulatoryPromptTemplate,
+                )
+                p = RegulatoryPromptTemplate.get_system_prompt()
             # For any other mode, clear the system prompt
             case _:
                 p = ""
@@ -263,6 +372,14 @@ class PrivateGptUi:
                 return "Chat with the LLM using its training data. Files are ignored."
             case Modes.SUMMARIZE_MODE:
                 return "Generate a summary of the selected files. Prompt to customize the result."
+            case Modes.CLINICAL_MODE:
+                return "Clinical trial mode: Answer questions about eligibility criteria, dosing, and safety."
+            case Modes.MOA_MODE:
+                return "Mechanism of Action mode: Answer questions about drug mechanisms and protein targets."
+            case Modes.PROTEIN_MODE:
+                return "Protein target mode: Answer questions about protein targets and interactions."
+            case Modes.REGULATORY_MODE:
+                return "Regulatory mode: Answer questions about FDA/EMA approvals and regulatory information."
             case _:
                 return ""
 
@@ -390,7 +507,13 @@ class PrivateGptUi:
             ".footer-zylon-ico { height: 20px; margin-left: 5px; background-color: antiquewhite; border-radius: 2px; }",
         ) as blocks:
             with gr.Row():
-                gr.HTML(f"<div class='logo'/><img src={logo_svg} alt=PrivateGPT></div")
+                gr.HTML(
+                    """
+                    <div class='logo'>
+                        <h1 style="font-size:32px; font-weight:700; color:#2b2b2b;">🧬 BioRAG Assistant</h1>
+                    </div>
+                    """
+                )
 
             with gr.Row(equal_height=False):
                 with gr.Column(scale=3):
